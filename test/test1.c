@@ -17,7 +17,7 @@ int main() {
         } else if (childPid == 0) {
             // Child process
             printf("Child process %d (PID: %d) spawned\n", i + 1, getpid());
-            sleep(120);
+            sleep(15);
             printf("Child process %d (PID: %d) exiting.\n", i + 1, getpid());
             exit(EXIT_SUCCESS);
         }
