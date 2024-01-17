@@ -50,11 +50,10 @@ static void print_physical_address(struct task_struct *task, unsigned long vaddr
     }
 
     pte = pte_offset_kernel(pmd, vaddr); // Get PTE entry for the virtual address
-    if (!pte || !pte_present(*pte)) { // Check if PTE entry is valid and present
+    if(pte_none(*pte) || !pte_present(*pte)) { // Check if PTE entry is valid and present
         printk(KERN_INFO "Page not present or pte not found\n");
         return;
     }
-
     paddr = (phys_addr_t)(pte_val(*pte) & PAGE_MASK) + (vaddr & ~PAGE_MASK); // Calculate physical address
 
     printk(KERN_INFO "PID: %d, Virtual Address: 0x%lx, Physical Address: 0x%llx\n",
