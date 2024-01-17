@@ -4,19 +4,19 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 
-#define IOCTL_GET_PHYSICAL_ADDRESS _IOR('q', 1, unsigned long)
-#define IOCTL_WRITE_TO_PHYSICAL _IOW('q', 2, struct ioctl_data)
+#define IOCTL_GET_PHYSICAL_ADDRESS _IOR('q', 1, unsigned long) // Macro to create ioctl call to get physical address
+#define IOCTL_WRITE_TO_PHYSICAL _IOW('q', 2, struct ioctl_data) // Macro to create ioctl call to write to physical address
 
-struct ioctl_data {
+struct ioctl_data { // Structure to store data for ioctl calls
     unsigned long virtual_address;
     unsigned long physical_address;
     char value;
 };
 
 int main() {
-    int file_desc;
-    char *user_memory;
-    struct ioctl_data user_data;
+    int file_desc; // File descriptor for the character device
+    char *user_memory; // Pointer to the value
+    struct ioctl_data user_data; // store user data for ioctl calls
 
     // Open the character device
     file_desc = open("/dev/ioctl_mod_dev", O_RDWR);
@@ -38,17 +38,19 @@ int main() {
 
     // Print the virtual address and value of the allocated memory
     printf("Virtual Address: %p, Value: %d\n", user_memory, *user_memory);
+    printf("Making ioctl call to get physical address..\n");
 
     // Make an ioctl call to get the physical address of the allocated memory
-    user_data.physical_address = 0;
-    user_data.virtual_address = (unsigned long) user_memory;
-    ioctl(file_desc, IOCTL_GET_PHYSICAL_ADDRESS, &user_data);
-    printf("Physical Address: %lx\n", user_data.physical_address);
+    user_data.physical_address = 0; // Initialize physical address to 0
+    user_data.virtual_address = (unsigned long) user_memory; // Assign virtual address of the allocated memory
+    ioctl(file_desc, IOCTL_GET_PHYSICAL_ADDRESS, &user_data); // Make ioctl call
+    printf("Received Physical Address: 0x%lx corresponding to Virtual Address: %p\n" , user_data.physical_address, user_memory);
 
     // Make another ioctl call to change the value of the memory to "5" using a physical memory address
-    user_data.value = 5;
-    ioctl(file_desc, IOCTL_WRITE_TO_PHYSICAL, &user_data);
-
+    user_data.value = 5; // Assign the value to be written
+    printf("Making ioctl call to write to physical address..\n");
+    ioctl(file_desc, IOCTL_WRITE_TO_PHYSICAL, &user_data); // Make ioctl call
+    
     // Verify the modified value by printing the content of the allocated memory
     printf("Modified Value: %d\n", *user_memory);
 

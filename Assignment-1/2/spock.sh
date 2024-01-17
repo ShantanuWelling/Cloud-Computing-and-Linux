@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Compile the ioctl driver
-make
+make > /dev/null
 
 # Load the ioctl driver module
 sudo insmod ioctl_mod.ko
@@ -14,7 +14,7 @@ sudo ./user
 sudo rmmod ioctl_mod.ko
 
 # Clean up compiled files
-make clean
+make clean > /dev/null
 
 # Remove user space executable
 rm user

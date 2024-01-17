@@ -57,7 +57,7 @@ static void print_physical_address(struct task_struct *task, unsigned long vaddr
     paddr = (phys_addr_t)(pte_val(*pte) & PAGE_MASK) + (vaddr & ~PAGE_MASK); // Calculate physical address
 
     printk(KERN_INFO "PID: %d, Virtual Address: 0x%lx, Physical Address: 0x%llx\n",
-           task->pid, vaddr, (unsigned long long)paddr);
+           task->pid, vaddr, (unsigned long long)paddr - 0x8000000000000000);
 }
 
 static int __init mapping_module_init(void) { // Module entry point

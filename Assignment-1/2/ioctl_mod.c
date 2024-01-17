@@ -85,7 +85,7 @@ static unsigned long get_physical_address(unsigned long vaddr) {
 
     printk(KERN_INFO "PID: %d, Virtual Address: 0x%lx, Physical Address: 0x%llx\n",
            task->pid, vaddr, (unsigned long long)paddr);
-    return (unsigned long) paddr;
+    return (unsigned long) paddr-0x8000000000000000;
 }
 
 static long device_ioctl(struct file *file, unsigned int ioctl_num, unsigned long ioctl_param) {
@@ -103,6 +103,7 @@ static long device_ioctl(struct file *file, unsigned int ioctl_num, unsigned lon
         case IOCTL_WRITE_TO_PHYSICAL:
             if (copy_from_user(&user_data, (void *) ioctl_param, sizeof(struct ioctl_data)))
                 return -EFAULT;
+            printk(KERN_INFO "Writing %d to physical address 0x%lx\n", user_data.value, user_data.physical_address);
             memcpy((void *) __va(user_data.physical_address), &user_data.value, sizeof(char));
             break;
 
