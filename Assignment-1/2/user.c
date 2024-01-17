@@ -1,14 +1,14 @@
-// user_program.c
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
+#include <unistd.h>
 #include <sys/ioctl.h>
 
 #define IOCTL_GET_PHYSICAL_ADDRESS _IOR('q', 1, unsigned long)
 #define IOCTL_WRITE_TO_PHYSICAL _IOW('q', 2, struct ioctl_data)
 
 struct ioctl_data {
+    unsigned long virtual_address;
     unsigned long physical_address;
     char value;
 };
@@ -19,7 +19,7 @@ int main() {
     struct ioctl_data user_data;
 
     // Open the character device
-    file_desc = open("/dev/ioctl_dd", O_RDWR);
+    file_desc = open("/dev/ioctl_mod_dev", O_RDWR);
     if (file_desc < 0) {
         perror("Failed to open the device");
         return -1;
@@ -41,6 +41,7 @@ int main() {
 
     // Make an ioctl call to get the physical address of the allocated memory
     user_data.physical_address = 0;
+    user_data.virtual_address = (unsigned long) user_memory;
     ioctl(file_desc, IOCTL_GET_PHYSICAL_ADDRESS, &user_data);
     printf("Physical Address: %lx\n", user_data.physical_address);
 

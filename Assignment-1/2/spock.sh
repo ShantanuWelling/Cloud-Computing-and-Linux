@@ -8,10 +8,10 @@ sudo insmod ioctl_mod.ko
 
 # Run the user space application
 gcc user.c -o user
-./user
+sudo ./user
 
 # Remove the ioctl driver module
-sudo rmmod ioctl_example
+sudo rmmod ioctl_mod.ko
 
 # Clean up compiled files
 make clean
