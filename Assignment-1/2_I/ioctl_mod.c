@@ -13,38 +13,36 @@
 #include <asm/current.h>
 #include <linux/sched.h>
 
-#define FIRST_MINOR 0
-#define MINOR_CNT 1
+#define FIRST_MINOR 0 // Minor number of device
+#define MINOR_CNT 1   // Number of minor numbers
 
-#define IOCTL_GET_PHYSICAL_ADDRESS _IOR('q', 1, unsigned long)
-#define IOCTL_WRITE_TO_PHYSICAL _IOW('q', 2, struct ioctl_data)
+#define IOCTL_GET_PHYSICAL_ADDRESS _IOR('q', 1, unsigned long) // Macro to get physical address
+#define IOCTL_WRITE_TO_PHYSICAL _IOW('q', 2, struct ioctl_data) // Macro to write to physical address
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Shantanu Welling");
 
-static dev_t dev;
-static struct cdev c_dev;
-struct class *cl;
+static dev_t dev; // Variable to hold device number
+static struct cdev c_dev; // Structure to hold character device
+struct class *cl; // Structure to hold device class
 
 static int my_open(struct inode *i, struct file *f)
-{
+{ // Custom open function for device file operations
     return 0;
 }
 static int my_close(struct inode *i, struct file *f)
-{
+{ // Custom close function for device file operations
     return 0;
 }
 
-struct ioctl_data {
-    unsigned long virtual_address;
-    unsigned long physical_address;
-    char value;
+struct ioctl_data { // Structure to store data for ioctl calls
+    unsigned long virtual_address; // Virtual address of the memory
+    unsigned long physical_address; // Physical address of the memory
+    char value; // Value to be written to the memory
 };
 
-// static char *kernel_memory;
-
 static unsigned long get_physical_address(unsigned long vaddr) {
-    // Print physical address of target virtual address
+    // Get physical address of target virtual address
     pgd_t *pgd; // Variables to store PGD, P4D, PUD, PMD and PTE entry of the multi-level page table
     p4d_t *p4d;
     pud_t *pud;
@@ -88,23 +86,27 @@ static unsigned long get_physical_address(unsigned long vaddr) {
     return (unsigned long) paddr-0x8000000000000000;
 }
 
+// device driver ioctl function
 static long device_ioctl(struct file *file, unsigned int ioctl_num, unsigned long ioctl_param) {
-    struct ioctl_data user_data;
-    struct ioctl_data *input = (struct ioctl_data *) ioctl_param;
+    struct ioctl_data user_data; // Structure to store data for ioctl calls
+    struct ioctl_data *input = (struct ioctl_data *) ioctl_param; // Pointer to input data for ioctl calls
     switch (ioctl_num) {
-        case IOCTL_GET_PHYSICAL_ADDRESS:
+        case IOCTL_GET_PHYSICAL_ADDRESS: // Case: Get physical address of the virtual address 
             user_data.virtual_address = input->virtual_address;
             user_data.value = input->value;
             user_data.physical_address = get_physical_address(user_data.virtual_address);
+            // Return physical address to user space via user_data struct
             if (copy_to_user((void *) ioctl_param, &user_data, sizeof(struct ioctl_data)))
                 return -EFAULT;
             break;
         
-        case IOCTL_WRITE_TO_PHYSICAL:
+        case IOCTL_WRITE_TO_PHYSICAL: // Case: Write to physical address
+        // Get user_data struct from user space
             if (copy_from_user(&user_data, (void *) ioctl_param, sizeof(struct ioctl_data)))
                 return -EFAULT;
             printk(KERN_INFO "Writing %d to physical address 0x%lx\n", user_data.value, user_data.physical_address);
-            memcpy((void *) __va(user_data.physical_address), &user_data.value, sizeof(char));
+            memcpy((void *) __va(user_data.physical_address), &user_data.value, sizeof(char)); 
+            // Write to physical address the value stored in user_data
             break;
 
         default:
@@ -114,58 +116,50 @@ static long device_ioctl(struct file *file, unsigned int ioctl_num, unsigned lon
     return 0;
 }
 
+// Custom file operations structure for device driver
 static struct file_operations fops = {
     .owner = THIS_MODULE,
     .open = my_open,
     .release = my_close,
-    .unlocked_ioctl = device_ioctl,
+    .unlocked_ioctl = device_ioctl, // ioctl function
 };
 
-static int __init ioctl_example_init(void) {
-    int ret; 
-    struct device *dev_ret;
+static int __init ioctl_example_init(void) { // Module initialization function
+    int ret; // Variable to store return values
+    struct device *dev_ret; // Variable to store device return values
+    // Allocate character device region
     if ((ret = alloc_chrdev_region(&dev, FIRST_MINOR, MINOR_CNT, "ioctl_mod")) < 0){
         return ret;
     }
-    cdev_init(&c_dev, &fops);
-    if ((ret = cdev_add(&c_dev, dev, MINOR_CNT)) < 0)
+    cdev_init(&c_dev, &fops); // Initialize character device
+    if ((ret = cdev_add(&c_dev, dev, MINOR_CNT)) < 0) // Add character device to system
     {
         return ret;
     }
-    if (IS_ERR(cl = class_create(THIS_MODULE, "char")))
-    {
+    if (IS_ERR(cl = class_create(THIS_MODULE, "char"))) // Create device class
+    { // If error, delete character device and unregister character device region
         cdev_del(&c_dev);
         unregister_chrdev_region(dev, MINOR_CNT);
         return PTR_ERR(cl);
     }
-    if (IS_ERR(dev_ret = device_create( cl, NULL, dev, NULL, "ioctl_mod_dev")))
-    {
+    if (IS_ERR(dev_ret = device_create( cl, NULL, dev, NULL, "ioctl_mod_dev"))) // Create device
+    { // If error, delete device class, character device and unregister character device region
         cdev_del(&c_dev);
         class_destroy(cl);
         unregister_chrdev_region(dev, MINOR_CNT);
         return PTR_ERR(dev_ret);
     }
-    // Allocate kernel memory
-    // kernel_memory = kmalloc(sizeof(char), GFP_KERNEL);
-    // if (!kernel_memory) {
-    //     printk(KERN_ERR "Failed to allocate kernel memory\n");
-    //     return -ENOMEM;
-    // }
-
-    // // Register character device
-    // register_chrdev(240, "ioctl_mod", &fops);
+    // Finished loading module successfully
     printk(KERN_INFO "ioctl_mod loaded\n");
     return 0;
 }
 
-static void __exit ioctl_example_exit(void) {
-    // Free allocated memory and unregister character device
-    // kfree(kernel_memory);
+static void __exit ioctl_example_exit(void) { // Module exit function
+    // Delete device, device class, character device and unregister character device region
     device_destroy(cl, dev);
     class_destroy(cl);
     cdev_del(&c_dev);
     unregister_chrdev_region(dev, MINOR_CNT);
-    // unregister_chrdev(240, "ioctl_mod");
     printk(KERN_INFO "ioctl_mod unloaded\n");
 }
 

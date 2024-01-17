@@ -8,9 +8,9 @@
 #define IOCTL_WRITE_TO_PHYSICAL _IOW('q', 2, struct ioctl_data) // Macro to create ioctl call to write to physical address
 
 struct ioctl_data { // Structure to store data for ioctl calls
-    unsigned long virtual_address;
-    unsigned long physical_address;
-    char value;
+    unsigned long virtual_address; // Virtual address of the memory
+    unsigned long physical_address; // Physical address of the memory
+    char value; // Value to be written to the memory
 };
 
 int main() {
@@ -48,7 +48,7 @@ int main() {
 
     // Make another ioctl call to change the value of the memory to "5" using a physical memory address
     user_data.value = 5; // Assign the value to be written
-    printf("Making ioctl call to write to physical address..\n");
+    printf("Making ioctl call to write value %d to physical address 0x%lx ..\n", user_data.value, user_data.physical_address);
     ioctl(file_desc, IOCTL_WRITE_TO_PHYSICAL, &user_data); // Make ioctl call
     
     // Verify the modified value by printing the content of the allocated memory

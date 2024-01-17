@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Compile the ioctl driver
-make > /dev/null
+make > /dev/null 2>&1
 
 # Load the ioctl driver module
 sudo insmod ioctl_mod.ko
