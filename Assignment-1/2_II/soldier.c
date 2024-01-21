@@ -45,7 +45,6 @@ int main(int argc, char** argv) {
 
     pid_t parent_pid = atoi(argv[1]);
 
-
     // open ioctl driver
     int file_desc; // File descriptor for the character device
     // Open the character device
@@ -60,8 +59,5 @@ int main(int argc, char** argv) {
 	
     // close ioctl driver
     close(file_desc);
-
 	return EXIT_SUCCESS;
 }
-
-

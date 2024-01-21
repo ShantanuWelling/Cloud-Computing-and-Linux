@@ -1,11 +1,11 @@
 #!/bin/bash
 
 ## Building the applications
-make 
+make > /dev/null 2>&1
 
 ## Build your ioctl driver and load it here
 
-sudo insmod ioctl_pid.ko
+insmod ioctl_pid.ko
 
 ###############################################
 
@@ -15,13 +15,13 @@ c_pid=$!
 echo "Control station PID: $c_pid"
 
 # Launching the soldier
-sudo ./soldier $c_pid &
+./soldier $c_pid &
 echo "Soldier PID: $!"
 
 sleep 2
 kill -9 $c_pid
 
 ## Remove the driver here
-sudo rmmod ioctl_pid.ko
+rmmod ioctl_pid.ko
 
-
+make clean > /dev/null 2>&1

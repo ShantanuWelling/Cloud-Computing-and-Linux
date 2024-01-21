@@ -1,4 +1,3 @@
-
 TARGETS = control_station soldier
 
 SOURCES = $(TARGETS:=.c)

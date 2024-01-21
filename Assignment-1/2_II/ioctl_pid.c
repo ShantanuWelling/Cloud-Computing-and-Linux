@@ -35,16 +35,18 @@ static int my_close(struct inode *i, struct file *f)
 }
 
 static long custom_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
-    pid_t new_parent_pid;
-    struct task_struct *new_parent_task, *current_task;
+    pid_t new_parent_pid; // Variable to store new parent PID
+    struct task_struct *new_parent_task, *current_task; // Variables to store new parent and current task_structs
 
     switch (cmd) {
         case IOCTL_SET_PARENT_PID:
+            // Get the new parent PID from user space
             if (copy_from_user(&new_parent_pid, (pid_t __user *)arg, sizeof(pid_t)))
                 return -EFAULT;
 
             // Find the task_struct of the new parent process
             new_parent_task = pid_task(find_vpid(new_parent_pid), PIDTYPE_PID);
+            // printk(KERN_INFO "New parent process PID %d %d\n", new_parent_pid, new_parent_task->pid);
             if (!new_parent_task)
                 return -ESRCH; // No such process
 
@@ -53,11 +55,16 @@ static long custom_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
             // Change the parent process to the new parent
             rcu_read_lock();
+            list_del(&current_task->sibling); // Remove from old parent's children list
             task_lock(current_task);
-            current_task->parent = new_parent_task;
+            current_task->parent = new_parent_task; // Change parent
+            current_task->real_parent = new_parent_task;
             task_unlock(current_task);
-            rcu_read_unlock();
+            // Add to new parent's children list
+            list_add_tail(&current_task->sibling, &new_parent_task->children);
 
+            rcu_read_unlock();
+            
             printk(KERN_INFO "Parent process changed to PID %d\n", new_parent_pid);
             break;
 
