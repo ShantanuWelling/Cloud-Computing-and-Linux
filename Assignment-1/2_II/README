@@ -1,1 +1,3 @@
 Run sudo bash, then run ./run_dr_doom.sh
+Modifications in soldier.c line 62: sleep(1);
+References: https://www.opensourceforu.com/2011/08/io-control-in-linux/

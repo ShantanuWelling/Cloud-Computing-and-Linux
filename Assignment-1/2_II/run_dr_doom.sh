@@ -23,5 +23,4 @@ kill -9 $c_pid
 
 ## Remove the driver here
 rmmod ioctl_pid.ko
-
 make clean > /dev/null 2>&1

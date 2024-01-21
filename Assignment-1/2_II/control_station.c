@@ -19,7 +19,6 @@ void sigchld_handler(int sig) {
 
 
 int main() {
-
     struct sigaction sa;
     sa.sa_handler = sigchld_handler;
     sigemptyset(&sa.sa_mask);

@@ -48,7 +48,7 @@ int main(int argc, char** argv) {
     // open ioctl driver
     int file_desc; // File descriptor for the character device
     // Open the character device
-    file_desc = open("/dev/ioctl_pid_dev", O_RDWR);
+    file_desc = open_driver("/dev/ioctl_pid_dev");
     if (file_desc < 0) {
         perror("Failed to open the device");
         return -1;
@@ -58,6 +58,7 @@ int main(int argc, char** argv) {
     ioctl(file_desc, IOCTL_SET_PARENT_PID, &parent_pid); // Make ioctl call
 	
     // close ioctl driver
-    close(file_desc);
+    close_driver("/dev/ioctl_pid_dev", file_desc);
+    sleep(1);
 	return EXIT_SUCCESS;
 }
