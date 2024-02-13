@@ -63,6 +63,10 @@
 #define PDE64_PS (1U << 7)
 #define PDE64_G (1U << 8)
 
+struct gva_to_hva {
+	uint32_t gva;
+	uint32_t hva;
+};
 
 struct vm {
 	int dev_fd;
@@ -157,7 +161,9 @@ int run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 {
 	struct kvm_regs regs;
 	uint64_t memval = 0;
-	uint32_t numexit =0;
+	uint32_t numexit =0; //Store number of VM exits
+	uint32_t numexit_in =0; //Store number of VM exits on IO in
+	uint32_t numexit_out =0; //Store number of VM exits on IO out
 
 	for (;;) {
 		if (ioctl(vcpu->vcpu_fd, KVM_RUN, 0) < 0) {
@@ -167,36 +173,101 @@ int run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 
 		switch (vcpu->kvm_run->exit_reason) {
 		case KVM_EXIT_HLT:
-			numexit++;
+			numexit++; //Increment the number of VM exits
 			goto check;
 
 		case KVM_EXIT_IO:
-			numexit++;
+			numexit++; //Increment the number of VM exits
 			if (vcpu->kvm_run->io.direction == KVM_EXIT_IO_OUT
 			    && vcpu->kvm_run->io.port == 0xE9) {
 				char *p = (char *)vcpu->kvm_run;
 				fwrite(p + vcpu->kvm_run->io.data_offset,
 				       vcpu->kvm_run->io.size, 1, stdout);
 				fflush(stdout);
+				numexit_out++; //Increment the number of VM exits on IO out
 				continue;
 			}else if (vcpu->kvm_run->io.direction == KVM_EXIT_IO_OUT
-			    && vcpu->kvm_run->io.port == 0xEA) {
-				char *p = (char *)vcpu->kvm_run;
-				printf("%u\n", *(uint32_t *)(p + vcpu->kvm_run->io.data_offset));
+			    && vcpu->kvm_run->io.port == 0xEA) { 
+				//Check if exit reason was I/O out and port was 0xEA
+				//Output the 32-bit value to port 0xEA using outl instruction
+				char *p = (char *)vcpu->kvm_run; //Get the pointer to kvm_run
+				//Get the offset that stores IO data and print the IO data
+				printf("%u\n", *(uint32_t *)(p + vcpu->kvm_run->io.data_offset)); 
 				fflush(stdout);
+				numexit_out++; //Increment the number of VM exits on IO out
 				continue;
 			}
 			else if(vcpu->kvm_run->io.direction == KVM_EXIT_IO_IN
 			    && vcpu->kvm_run->io.port == 0xEB){
-				char *p = (char *)vcpu->kvm_run;
+				//Check if exit reason was I/O in and port was 0xEB
+				char *p = (char *)vcpu->kvm_run; 
+				//Get the offset that stores IO data and store the number of VM exits
+				//in that address
 				*(uint32_t *)(p + vcpu->kvm_run->io.data_offset) = numexit;
+				numexit_in++; //Increment the number of VM exits on IO in
 				continue;
 			}
 			else if(vcpu->kvm_run->io.direction == KVM_EXIT_IO_OUT
 			    && vcpu->kvm_run->io.port == 0xEC){
+				//Check if exit reason was I/O out and port was 0xEC
 				char *p = (char *)vcpu->kvm_run;
+				//Get the offset that stores IO data which stores the address of the string
 				uint32_t *loc = (uint32_t *)(p + vcpu->kvm_run->io.data_offset); 
-				printf("%s", &vm->mem[*loc]);
+				struct kvm_translation tr; //Translate GVA to GPA
+				tr.linear_address = *loc;
+				if (ioctl(vcpu->vcpu_fd, KVM_TRANSLATE, &tr) == -1) {
+					fprintf(stderr, "ioctl KVM_TRANSLATE failed\n");
+					exit(EXIT_FAILURE);
+				}
+				if(tr.valid){ //If the translation is valid
+					uint32_t gpa = (uint32_t) tr.physical_address; //Get the GPA
+					//Index that address memory of VM and print the string
+					printf("%s", &vm->mem[gpa]);
+					fflush(stdout);
+				}
+				else{//If the translation is invalid
+					printf("Invalid String Addr\n");
+					fflush(stdout);
+				}
+				numexit_out++; //Increment the number of VM exits on IO out
+				continue;
+			}
+			else if(vcpu->kvm_run->io.direction == KVM_EXIT_IO_OUT
+			    && vcpu->kvm_run->io.port == 0xED){
+				numexit_out++; //Increment the number of VM exits on IO out
+				char *p = (char *)vcpu->kvm_run;
+				uint32_t *loc = (uint32_t *)(p + vcpu->kvm_run->io.data_offset);
+				char io_data[100]; //Store the IO data in this buffer
+				sprintf(io_data, "IO in: %u\nIO out: %u\n", numexit_in, numexit_out);
+				strcpy(&vm->mem[*loc], io_data);
+				continue;
+			}
+			else if(vcpu->kvm_run->io.direction == KVM_EXIT_IO_OUT
+			    && vcpu->kvm_run->io.port == 0xFF0){
+				char *p = (char *)vcpu->kvm_run;
+				uint32_t *ptr = (uint32_t *)(p + vcpu->kvm_run->io.data_offset);
+				//Get the pointer to the struct gva_to_hva
+				struct gva_to_hva * ptr_struct = (struct gva_to_hva *)&vm->mem[*ptr];
+				uint32_t gva = ptr_struct->gva; //Get the GVA from the struct
+				// printf("GVA: %u\n", gva);
+				struct kvm_translation tr; //Translate GVA to GPA
+				tr.linear_address = gva; 
+				if (ioctl(vcpu->vcpu_fd, KVM_TRANSLATE, &tr) == -1) {
+					fprintf(stderr, "ioctl KVM_TRANSLATE failed\n");
+					exit(EXIT_FAILURE);
+				}	
+				if(tr.valid){ //If the translation is valid
+					uint32_t gpa = (uint32_t) tr.physical_address; //Get the GPA
+					ptr_struct->hva = (uint32_t)(intptr_t) &vm->mem[gpa]; //Get the HVA from GPA
+					// char * hv1 = &vm->mem[gpa];
+					fflush(stdout);
+				}
+				else{//If the translation is invalid
+					ptr_struct->hva = 0;
+					printf("Invalid GVA\n");
+					fflush(stdout);
+				}
+				numexit_out++; //Increment the number of VM exits on IO out
 				continue;
 			}
 
@@ -206,6 +277,12 @@ int run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 			fprintf(stderr,	"Got exit_reason %d,"
 				" expected KVM_EXIT_HLT (%d)\n",
 				vcpu->kvm_run->exit_reason, KVM_EXIT_HLT);
+			printf("phys %llu\n", vcpu->kvm_run->mmio.phys_addr);
+			printf("len %u\n", vcpu->kvm_run->mmio.len);
+			for (int i = 0; i < 8; i++) {
+				printf("%u ", vcpu->kvm_run->mmio.data[i]);  // Assuming u8 is an unsigned integer type
+			}
+			printf("is_write %u\n", vcpu->kvm_run->mmio.is_write);
 			exit(1);
 		}
 	}

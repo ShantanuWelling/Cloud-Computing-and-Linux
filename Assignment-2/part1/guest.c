@@ -1,6 +1,15 @@
 #include <stddef.h>
 #include <stdint.h>
 
+struct gva_to_hva { 
+	// Structure to store the gva and hva for communicating with hypervisor
+	uint32_t gva;
+	uint32_t hva;
+}; 
+
+char str1[100][100]; // Store the strings for HC_numExitsByType
+int str_ind=0;		// Index to store the strings in str1
+
 static void outb(uint16_t port, uint8_t value) {
 	asm("outb %0,%1" : /* empty */ : "a" (value), "Nd" (port) : "memory");
 }
@@ -11,7 +20,7 @@ void HC_print8bit(uint8_t val)
 }
 
 void HC_print32bit(uint32_t val)
-{
+{	
 	// Output the 32-bit value to port 0xE9 using outl instruction
 	uint16_t port = 0xEA;
     asm("outl %0, %1" : : "a" (val), "Nd" (port) : "memory");
@@ -23,7 +32,6 @@ uint32_t HC_numExits()
 	uint32_t val; // Store the numExits value read from port 0xEB
 	asm("inl %1, %0" : "=a" (val) : "Nd" (port) : "memory");
 	return val;
-	
 }
 
 void HC_printStr(char *str)
@@ -35,15 +43,21 @@ void HC_printStr(char *str)
 
 char *HC_numExitsByType()
 {
-	// Fill in here
-	return NULL;	// Remove this
+	uint16_t port = 0xED;
+	// Store the string in str1 and send the address of the string to hypv
+	asm("outl %0, %1" : : "a" ((uint32_t)(intptr_t)(str1[str_ind])), "Nd" (port) : "memory");
+	return str1[str_ind++];	
 }
 
 uint32_t HC_gvaToHva(uint32_t gva)
 {
-	// Fill in here
-	gva++;		// Remove this
-	return 0;	// Remove this
+	uint16_t port = 0xFF0;
+	struct gva_to_hva arr; // Store the gva and hva
+	arr.gva = gva;
+	arr.hva = 0;
+	// Send the gva to hypervisor and get the hva
+	asm("outl %0, %1" : : "a" ((uint32_t)(intptr_t)&arr), "Nd" (port) : "memory");
+	return arr.hva;	
 }
 
 void
