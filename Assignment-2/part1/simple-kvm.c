@@ -239,7 +239,17 @@ int run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 				uint32_t *loc = (uint32_t *)(p + vcpu->kvm_run->io.data_offset);
 				char io_data[100]; //Store the IO data in this buffer
 				sprintf(io_data, "IO in: %u\nIO out: %u\n", numexit_in, numexit_out);
-				strcpy(&vm->mem[*loc], io_data);
+				struct kvm_translation tr; //Translate GVA to GPA
+				tr.linear_address = *loc; 
+				if (ioctl(vcpu->vcpu_fd, KVM_TRANSLATE, &tr) == -1) {
+					fprintf(stderr, "ioctl KVM_TRANSLATE failed\n");
+					exit(EXIT_FAILURE);
+				}
+				if(!tr.valid){
+					perror("NumExitsByType String Addr error\n");
+					exit(1);
+				}
+				strcpy(&vm->mem[tr.physical_address], io_data);
 				continue;
 			}
 			else if(vcpu->kvm_run->io.direction == KVM_EXIT_IO_OUT
@@ -247,7 +257,18 @@ int run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 				char *p = (char *)vcpu->kvm_run;
 				uint32_t *ptr = (uint32_t *)(p + vcpu->kvm_run->io.data_offset);
 				//Get the pointer to the struct gva_to_hva
-				struct gva_to_hva * ptr_struct = (struct gva_to_hva *)&vm->mem[*ptr];
+				struct kvm_translation tr1;
+				tr1.linear_address = *ptr;
+				if (ioctl(vcpu->vcpu_fd, KVM_TRANSLATE, &tr1) == -1) {
+					fprintf(stderr, "ioctl KVM_TRANSLATE failed\n");
+					exit(EXIT_FAILURE);
+				}
+				if(!tr1.valid){
+					perror("Struct GVA_TO_HVA Addr error\n");
+					exit(1);
+				}
+
+				struct gva_to_hva * ptr_struct = (struct gva_to_hva *)&vm->mem[tr1.physical_address];
 				uint32_t gva = ptr_struct->gva; //Get the GVA from the struct
 				// printf("GVA: %u\n", gva);
 				struct kvm_translation tr; //Translate GVA to GPA
@@ -258,7 +279,10 @@ int run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 				}	
 				if(tr.valid){ //If the translation is valid
 					uint32_t gpa = (uint32_t) tr.physical_address; //Get the GPA
-					ptr_struct->hva = (uint32_t)(intptr_t) &vm->mem[gpa]; //Get the HVA from GPA
+					char * temp = (char *)&vm->mem[gpa]; //Pointer casting
+					uint32_t *tempptr = (uint32_t *) &temp;
+					uint32_t val = *tempptr;
+					ptr_struct->hva = val; //Get the HVA from GPA
 					// char * hv1 = &vm->mem[gpa];
 					fflush(stdout);
 				}
@@ -277,12 +301,6 @@ int run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 			fprintf(stderr,	"Got exit_reason %d,"
 				" expected KVM_EXIT_HLT (%d)\n",
 				vcpu->kvm_run->exit_reason, KVM_EXIT_HLT);
-			printf("phys %llu\n", vcpu->kvm_run->mmio.phys_addr);
-			printf("len %u\n", vcpu->kvm_run->mmio.len);
-			for (int i = 0; i < 8; i++) {
-				printf("%u ", vcpu->kvm_run->mmio.data[i]);  // Assuming u8 is an unsigned integer type
-			}
-			printf("is_write %u\n", vcpu->kvm_run->mmio.is_write);
 			exit(1);
 		}
 	}
@@ -393,6 +411,7 @@ int run_protected_mode(struct vm *vm, struct vcpu *vcpu)
 	/* Clear all FLAGS bits, except bit 1 which is always set. */
 	regs.rflags = 2;
 	regs.rip = 0;
+	regs.rsp = 2 << 20;
 
 	if (ioctl(vcpu->vcpu_fd, KVM_SET_REGS, &regs) < 0) {
 		perror("KVM_SET_REGS");
@@ -443,6 +462,7 @@ int run_paged_32bit_mode(struct vm *vm, struct vcpu *vcpu)
 	/* Clear all FLAGS bits, except bit 1 which is always set. */
 	regs.rflags = 2;
 	regs.rip = 0;
+	regs.rsp = 2 << 20;
 
 	if (ioctl(vcpu->vcpu_fd, KVM_SET_REGS, &regs) < 0) {
 		perror("KVM_SET_REGS");

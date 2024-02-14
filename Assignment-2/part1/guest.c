@@ -5,10 +5,17 @@ struct gva_to_hva {
 	// Structure to store the gva and hva for communicating with hypervisor
 	uint32_t gva;
 	uint32_t hva;
-}; 
+} arr; 
 
 char str1[100][100]; // Store the strings for HC_numExitsByType
 int str_ind=0;		// Index to store the strings in str1
+
+//Its possible to do the hypercalls without global variables but while passing 
+// the address of the local variable to the hyperv and writing to that addr
+// in vm->mem by hypv gives MMIO exit to notify the userspace about MMIO
+// Alternative is to pass an argument to the hypercall so that hypv can write
+// to the argument and return the value to the guest, but the structure of 
+// the hypercalls is already defined and we cannot change it.
 
 static void outb(uint16_t port, uint8_t value) {
 	asm("outb %0,%1" : /* empty */ : "a" (value), "Nd" (port) : "memory");
@@ -37,26 +44,27 @@ uint32_t HC_numExits()
 void HC_printStr(char *str)
 {
 	uint16_t port = 0xEC;
-	uint32_t val = (intptr_t)str; // Store the address of the string
-	asm("outl %0, %1" : : "a" (val), "Nd" (port) : "memory");
+	asm("outl %0, %1" : : "a" ((uint32_t)(long)str), "Nd" (port) : "memory");
 }
 
 char *HC_numExitsByType()
 {
 	uint16_t port = 0xED;
 	// Store the string in str1 and send the address of the string to hypv
-	asm("outl %0, %1" : : "a" ((uint32_t)(intptr_t)(str1[str_ind])), "Nd" (port) : "memory");
+	asm("outl %0, %1" : : "a" ((uint32_t)(long)(str1[str_ind])), "Nd" (port) : "memory");
 	return str1[str_ind++];	
 }
 
 uint32_t HC_gvaToHva(uint32_t gva)
 {
 	uint16_t port = 0xFF0;
-	struct gva_to_hva arr; // Store the gva and hva
 	arr.gva = gva;
 	arr.hva = 0;
+	char * a = (char *) &arr;
+	uint32_t *gva_ptr = (uint32_t *) &a;
+	uint32_t val = *gva_ptr;
 	// Send the gva to hypervisor and get the hva
-	asm("outl %0, %1" : : "a" ((uint32_t)(intptr_t)&arr), "Nd" (port) : "memory");
+	asm("outl %0, %1" : : "a" (val), "Nd" (port) : "memory");
 	return arr.hva;	
 }
 
