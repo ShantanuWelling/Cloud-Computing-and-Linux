@@ -272,6 +272,7 @@ void kvm_run_vm(struct vm *vm1, struct vm *vm2)
 {
     struct vm *current_vm = vm1; // Initialize with vm1
     int ret = 0, cvm=1; // Return value of VM run, int for current VM
+    int vm1timer=0, vm2timer=0; // Timer for VM1 and VM2
 
     sigset_t sigset; // Signal set for blocking signals
     sigemptyset(&sigset); // Initialize signal set
@@ -294,9 +295,9 @@ void kvm_run_vm(struct vm *vm1, struct vm *vm2)
     if (timer_create(CLOCK_REALTIME, &sev, &timerid) == -1){
         perror("timer_create"); exit(EXIT_FAILURE);
     }
-    its.it_value.tv_sec = 1; // Initial expiration after 1 second
+    its.it_value.tv_sec = QUANTUM; // Initial expiration after 1 second
     its.it_value.tv_nsec = 0; 
-    its.it_interval.tv_sec = 1; // Periodic interval of 1 second
+    its.it_interval.tv_sec = QUANTUM; // Periodic interval of 1 second
     its.it_interval.tv_nsec = 0;
     
     // Set timer to expire after 1 second and then every 1 second
@@ -306,17 +307,10 @@ void kvm_run_vm(struct vm *vm1, struct vm *vm2)
     while (1)
     {   if(cvm==1){
             current_vm = vm1;               // Set current VM to vm1
-            its.it_value.tv_sec = FRAC_A; // Initial expiration after FRAC_A
-            its.it_interval.tv_sec = FRAC_A; // Periodic interval of FRAC_A
         }
         else{
             current_vm = vm2;               // Set current VM to vm2
-            its.it_value.tv_sec = FRAC_B; // Initial expiration after FRAC_B
-            its.it_interval.tv_sec = FRAC_B; // Periodic interval of FRAC_B
         }
-        // Set timer to expire after FRAC_A or FRAC_B seconds
-        if (timer_settime(timerid, 0, &its, NULL) == -1)
-            {perror("timer_settime"); exit(EXIT_FAILURE);}
 
         kvm_reset_vcpu(current_vm->vcpus);
 
@@ -357,10 +351,14 @@ void kvm_run_vm(struct vm *vm1, struct vm *vm2)
                 break;
             case KVM_EXIT_INTR:
                 printf("VMFD: %d KVM_EXIT_INTR\n", current_vm->vm_fd);
-                if (current_vm == vm1) // If current VM is vm1, switch to vm2
-                    cvm=2;
-                else                    // If current VM is vm2, switch to vm1
-                    cvm=1;
+                if (current_vm == vm1){ // If current VM is vm1, switch to vm2
+                    vm1timer++;
+                    if(vm1timer==FRAC_A) {cvm=2; vm1timer=0;}
+                }
+                else{
+                    vm2timer++;           
+                    if(vm2timer==FRAC_B) {cvm=1; vm2timer=0;}
+                }                                       
                 break;
             case KVM_EXIT_SHUTDOWN:
                 printf("VMFD: %d KVM_EXIT_SHUTDOWN\n", current_vm->vm_fd);
