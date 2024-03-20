@@ -38,7 +38,9 @@ echo -e "\nHostname in the host: $(hostname)"
 ## Subtask 3: Execute in a new root filesystem with new PID, UTS and IPC namespace + Resource Control
 # Create a new cgroup and set the max CPU utilization to 50% of the host CPU. (Consider only 1 CPU core)
 CGROUP_DIR=/sys/fs/cgroup/mycg
+echo "+cpuset" >> /sys/fs/cgroup/cgroup.subtree_control
 mkdir $CGROUP_DIR
+echo "0" > $CGROUP_DIR/cpuset.cpus
 echo "50000 100000" > $CGROUP_DIR/cpu.max
 
 echo "__________________________________________"
