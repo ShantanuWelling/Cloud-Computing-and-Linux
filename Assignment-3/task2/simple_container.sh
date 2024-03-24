@@ -38,21 +38,27 @@ echo -e "\nHostname in the host: $(hostname)"
 ## Subtask 3: Execute in a new root filesystem with new PID, UTS and IPC namespace + Resource Control
 # Create a new cgroup and set the max CPU utilization to 50% of the host CPU. (Consider only 1 CPU core)
 CGROUP_DIR=/sys/fs/cgroup/mycg
+TASKS_DIR=/tasks
 echo "+cpuset" >> /sys/fs/cgroup/cgroup.subtree_control
+echo "+cpu" >> /sys/fs/cgroup/cgroup.subtree_control
 mkdir $CGROUP_DIR
-echo "0" > $CGROUP_DIR/cpuset.cpus
+echo "+cpu" > $CGROUP_DIR/cgroup.subtree_control
+echo "+cpuset" > $CGROUP_DIR/cgroup.subtree_control
+echo "1" > $CGROUP_DIR/cpuset.cpus
 echo "50000 100000" > $CGROUP_DIR/cpu.max
+mkdir $CGROUP_DIR$TASKS_DIR
 
 echo "__________________________________________"
 echo -e "\n\e[1;32mOutput Subtask 2c\e[0m"
 # Assign pid to the cgroup such that the container_prog runs in the cgroup
 # Run the container_prog in the new root filesystem with new PID, UTS and IPC namespace
 # You should pass "subtask1" as an argument to container_prog
-echo $$ > $CGROUP_DIR/cgroup.procs
+echo $$ > $CGROUP_DIR$TASKS_DIR/cgroup.procs
 unshare --fork --pid --uts --ipc --mount-proc chroot $SIMPLE_CONTAINER_ROOT /container_prog subtask3
 
 # Remove the cgroup
 echo $$ > /sys/fs/cgroup/cgroup.procs
+rmdir $CGROUP_DIR$TASKS_DIR
 rmdir $CGROUP_DIR
 
 # If mounted dependent libraries, unmount them, else ignore
