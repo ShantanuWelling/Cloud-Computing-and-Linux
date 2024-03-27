@@ -28,7 +28,7 @@ ln -s ../task3/config.sh config.sh
 # 8. Within your host system open/curl the url: http://localhost:3000 to verify output of the service
 # 9. On any system which can ping the host system open/curl the url: `http://<host-ip>:3000` to verify
 #    output of the service
-# ./conductor.sh build mydebian
+./conductor.sh build mydebian
 ./conductor.sh run mydebian c1 sleep inf > /dev/null 2>&1 &
 ./conductor.sh run mydebian c2 sleep inf > /dev/null 2>&1 &
 sleep 5
