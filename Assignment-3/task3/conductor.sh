@@ -144,7 +144,8 @@ run()
     # - When unshare process exits all of its children also exit (--kill-child option)
     # - permission of root dir within container should be set to 755 for apt to work correctly
     # - $INIT_CMD_ARGS should be the entry program for the container 
-    unshare --kill-child --fork -n -u -p -i -m chroot "$CONTAINERDIR/$NAME/rootfs" /bin/bash -c "chmod 755 / && mount -t proc none /proc && mount -t sysfs none /sys; $INIT_CMD_ARGS"
+    chmod 755 "$CONTAINERDIR/$NAME/rootfs"
+    unshare --kill-child --fork -n -u -p -i -m --mount-proc="$CONTAINERDIR/$NAME/rootfs/proc" chroot "$CONTAINERDIR/$NAME/rootfs" /bin/bash -c "mount -t sysfs none /sys; $INIT_CMD_ARGS"
 }
 
 # This will show containers that are currently running
@@ -294,9 +295,8 @@ addnetwork()
     # Inside the container, it should use INSIDE_PEER interface and within the host it should use
     # OUTSIDE_PEER interface
     # You should use iproute2 tool (ip command)
-    # ip link add $OUTSIDE_PEER type veth peer name $INSIDE_PEER
-    # ip link set $OUTSIDE_PEER up
-    # ip link set $INSIDE_PEER netns $PID
+    ip link add $OUTSIDE_PEER type veth peer name $INSIDE_PEER
+    ip link set "$INSIDE_PEER" netns "$NAME"
 
     # Lesson: By default linux does not forward packets, it only acts as an end host
     # We need to enable packet forwarding capability to forward packets to our containers
@@ -306,10 +306,9 @@ addnetwork()
     # Enable the interfaces that you have created within the host and the container
     # You should also enable lo interface within the container (which is disabled by default)
     # In total here 3 interfaces should be enabled
-    # ip link set $INSIDE_PEER up netns $PID
-    # ip link set lo up netns $PID
-    # ip link set $OUTSIDE_PEER up
-
+    ip link set dev "$OUTSIDE_PEER" up
+    ip netns exec "$NAME" ip link set dev lo up
+    ip netns exec "$NAME" ip link set dev "$INSIDE_PEER" up
 
     # Lesson: Configuring addresses and adding routes for the container in the routing table
     # according to the addressing conventions selected above

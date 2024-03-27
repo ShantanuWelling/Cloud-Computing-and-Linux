@@ -7,9 +7,9 @@ DEFAULT_IFC=enp0s3
 
 
 # These are the configuration files that you may have to fill
-IP4_SUBNET=10.0.2
+IP4_SUBNET=192.168
 IP4_PREFIX_SIZE=24 # Size of assigned prefixes
-IP4_FULL_PREFIX_SIZE=24 # Size of IP4_SUBNET
+IP4_FULL_PREFIX_SIZE=16 # Size of IP4_SUBNET
 
 
 
