@@ -144,7 +144,7 @@ run()
     # - When unshare process exits all of its children also exit (--kill-child option)
     # - permission of root dir within container should be set to 755 for apt to work correctly
     # - $INIT_CMD_ARGS should be the entry program for the container 
-    chmod 755 "$CONTAINERDIR/$NAME/rootfs"
+    chmod +755 "$CONTAINERDIR/$NAME/rootfs"
     unshare --kill-child --fork -n -u -p -i -m --mount-proc="$CONTAINERDIR/$NAME/rootfs/proc" chroot "$CONTAINERDIR/$NAME/rootfs" /bin/bash -c "mount -t sysfs none /sys; $INIT_CMD_ARGS"
 }
 
@@ -237,7 +237,7 @@ exec()
     # The executed process should be within correct namespace and root
     # directory as of the container and tools like ps, top should show only processes
     # running within the container
-    nsenter -t $CONTAINER_INIT_PID -m -u -i -n -p chroot "$PWD/$CONTAINERDIR/$NAME/rootfs" $EXEC_CMD_ARGS
+    nsenter -t $CONTAINER_INIT_PID -m -u -i -n -p -r -w $EXEC_CMD_ARGS
 
 }
 
@@ -306,9 +306,9 @@ addnetwork()
     # Enable the interfaces that you have created within the host and the container
     # You should also enable lo interface within the container (which is disabled by default)
     # In total here 3 interfaces should be enabled
-    ip link set dev "$OUTSIDE_PEER" up
-    ip netns exec "$NAME" ip link set dev lo up
-    ip netns exec "$NAME" ip link set dev "$INSIDE_PEER" up
+    ip link set "$OUTSIDE_PEER" up
+    ip netns exec "$NAME" ip link set lo up
+    ip netns exec "$NAME" ip link set "$INSIDE_PEER" up
 
     # Lesson: Configuring addresses and adding routes for the container in the routing table
     # according to the addressing conventions selected above
